@@ -1,0 +1,183 @@
+//start voice.html
+<!DOCTYPE html>
+<html>
+<head>
+ <title>Convert Voice to Text</title>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.
+5.2/css/bootstrap.min.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.mi
+n.js"></script>
+<style>
+ body {
+ display: flex;
+ flex-direction: column;
+ justify-content: center;
+ padding-left:20px ;
+ padding-right:20px ;
+ }
+ .custom-input {
+ width: 100%;
+ height: 100px;
+}
+.custom-bold {
+ font-weight: bold;
+ color: white;
+}
+ </style>
+</head>
+ <body>
+ <h1>Convert Voice to Text</h1>
+ <div class="row p-2 ">
+ <button id="recordButton" onclick="startRecording()" class="btn
+btn-success col-5 mx-1">Start Recording</button>
+ <button id="stopButton" onclick="stopRecording()" disabled class
+="btn btn-danger col-5 mx-1">Stop Recording</button>
+ <div id="message" class="font-weight-bold fs-5 custom-bold"></div>
+ </div>
+ <div class="row">
+ <div class="col-12 ">
+ <form id="nameForm">
+ <input type="text" id="nameInput" class="mt-3 form-controllg custom-input" required>
+ </div>
+ <div class="col-12 d-flex justify-content-center py-2">
+ <button type="button" class="btn btn-success" id="saveButton">
+Save to Database 
+</button>
+</form>
+ </div>
+ </div>
+ <div class="col-12 d-flex justify-content-center py-2">
+ <button type="button" class="btn btnsuccess" id="getDataButton">Get Data From Database</button>
+ </div>
+ <table class="table">
+ <thead>
+ <tr>
+ <th scope="col">Text</th>
+ <th scope="col">Date</th>
+ </tr>
+ </thead>
+ <tbody id="tableBody">
+ </tbody>
+ </table>
+<script>
+ $(document).ready(function() {
+ $('#saveButton').click(function(event)
+ {
+ event.preventDefault(); // Prevent form from submitting normally
+ var name = $('#nameInput').val();
+ // Send the data to the PHP page using AJAX
+ $.ajax({
+ url: 'saveVoice.php',
+
+ type: 'POST',
+ data: { name: name },
+ success: function(response)
+ { $('#message').addClass('bg-success my-3 p1').text(response);
+ },
+ error: function(xhr, status, error)
+ { console.error(xhr.responseText);
+ let recognizer;
+ let textTextArea = document.getElementById("nameInput");
+ let recordButton = document.getElementById("recordButton");
+ let stopButton = document.getElementById("stopButton");
+ function startRecording() {
+ recordButton.disabled = true;
+ stopButton.disabled = false;
+ textTextArea.value = "";
+ recognizer = new webkitSpeechRecognition();
+ recognizer.continuous = true;
+ recognizer.interimResults = true;
+ recognizer.lang = "ar-EG,enUS"; // Arabic (Egypt) and English (United States) languages
+ recognizer.onresult = function(event) {
+ let text = "";
+ for (let i = event.resultIndex; i < event.results.length; ++i) {
+ if (event.results[i].isFinal) {
+ text += event.results[i][0].transcript;
+ textTextArea.value = text;
+ };
+ recognizer.onerror = function(event) {
+ console.error("Recognition error: " + event.error);
+ };
+ recognizer.start()
+ function stopRecording() {
+ recordButton.disabled = false;
+ stopButton.disabled = true;
+ recognizer.stop(
+ $('#getDataButton').click(function()
+ { $.ajax({ url: 'getData.php',
+ type: 'GET', dataType: 'json',
+ success: function(data)
+ { if (data.length > 0)
+ { var tableRows = ''; $.each(data, function(index, row)
+ { tableRows += '<tr>'; tableRows += '<td>' + row.voice_txt + '</td
+>'; tableRows +=
+ '<td>' + row.date + '</td>'; tableRows += '</tr>';
+ }); $('#tableBody').html(tableRows); }
+ else { $('#tableBody').html('<tr><td colspan="2">No data found.
+</td></tr>');
+ } },
+ error: function()
+ {
+ $('#tableBody').html('<tr><td colspan="2">Error retrieving da
+ta.</td></tr>');
+ });
+ </script>
+ </body>
+ </html>
+//end voice.html
+//start saveVoice.html
+<?php
+if (isset($_POST['name'])) {
+ $name = $_POST['name'];
+ $date=date('Y-m-d H:i:s');
+ // Database connection details
+ $servername = "localhost";
+ $username = "root";
+ $password = "";
+ $dbname = "voice";
+ try {
+ $pdo = new PDO("mysql:host=$servername;dbname=$dbname", $username, $pa
+ssword);
+ $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+ $sql = "INSERT INTO voice_text (voice_txt,date) VALUES (?,?)";
+ $stmt = $pdo->prepare($sql);
+ $stmt->bindParam(1, $name);
+ $stmt->bindParam(2, $date);
+ if ($stmt->execute()) {
+ echo " saved successfully.";
+ } else {
+ echo "Error: Unable to save text .";
+ } catch (PDOException $e) {
+ echo "Connection failed: " . $e->getMessage();
+?>
+//end saveVoic.php
+//start getData.php
+<?php
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "voice";
+try {
+ $pdo = new PDO("mysql:host=$servername;dbname=$dbname", $username, $pass
+word);
+ $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+ $sql = "SELECT * FROM voice_text";
+ $stmt = $pdo->prepare($sql);
+ $stmt->execute();
+ $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+ if ($stmt->rowCount() > 0) {
+ $data = array();
+ foreach ($result as $row) {
+ $data[] = array(
+ 'voice_txt' => $row['voice_txt'],
+ 'date' => $row['date']
+ );
+ }
+ echo json_encode($data);
+ } else {
+ echo json_encode(array("message" => "No data found."));
+ }
+} catch (PDOException $e) {
+ echo "Connection failed: " . $e->getMessage();
+}
+?>
